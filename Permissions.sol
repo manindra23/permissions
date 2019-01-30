@@ -4,9 +4,9 @@ contract Permissions {
   address owner;
   //Mapping between granter address and receiver map which in turn
   //contains mapping between receiver address and his/her permission
-  mapping (address => mapping (address => bool)) public permissions;
+  mapping (address => mapping (address => bool)) public granterReceiverPermissionsMap;
   //Mapping between receiver address and his/her permission
-  mapping (address => bool) receiverPermissionsGlobal;
+  mapping (address => bool) receiverPermissionsMapGlobal;
 
   //Entity to be accessed based on permission
   struct MedicalRecord {
@@ -26,7 +26,7 @@ contract Permissions {
 
   modifier onlyUserWithoutPermission(address receiverAddress) {
     require(
-        !permissionExists(receiverAddress),
+        !receiverPermissionsMapGlobal[receiverAddress],
         "Permission already granted for the user"
     );
     _;
@@ -34,7 +34,7 @@ contract Permissions {
 
   modifier onlyUserWithPermission(address receiverAddress) {
     require(
-        permissionExists(receiverAddress),
+        receiverPermissionsMapGlobal[receiverAddress],
         "User does not have permission"
     );
     _;
@@ -45,21 +45,17 @@ contract Permissions {
 
   function grantPermission(address receiverAddress) public onlyUserWithoutPermission(receiverAddress) returns (bool) {
     bool result = false;
-    mapping (address => bool) storage receiverPermissionsLocal = permissions[msg.sender];
+    mapping (address => bool) storage receiverPermissionsMapLocal = granterReceiverPermissionsMap[msg.sender];
     result = true;
-    receiverPermissionsLocal[receiverAddress] = result;
-    receiverPermissionsGlobal[receiverAddress] = result;
+    receiverPermissionsMapLocal[receiverAddress] = result;
+    receiverPermissionsMapGlobal[receiverAddress] = result;
     emit PermissionGranted(receiverAddress, result);
     return result;
   }
 
   function hasPermission(address granterAddress) public view returns (bool) {
-    mapping (address => bool) storage receiverPermissionsLocal = permissions[granterAddress];
-    return receiverPermissionsLocal[msg.sender];
-  }
-
-  function permissionExists(address receiverAddress) internal view returns (bool) {
-    return receiverPermissionsGlobal[receiverAddress];
+    mapping (address => bool) storage receiverPermissionsMapLocal = granterReceiverPermissionsMap[granterAddress];
+    return receiverPermissionsMapLocal[msg.sender];
   }
 
   function viewMedicalRecord() public view onlyUserWithPermission(msg.sender) returns (string memory, address, uint, uint, string memory) {
