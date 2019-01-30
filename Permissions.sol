@@ -1,47 +1,76 @@
 pragma solidity^0.5.3;
 
 contract Permissions {
-  uint count;
   address owner;
-  mapping (address => address[5]) public permissions;
+  mapping (address => mapping (address => bool)) public permissions;
+  mapping (address => bool) receiverPermissionsGlobal;
 
   struct MedicalRecord {
     string name;
-    address patient;
-    address hospital;
+    address hospitalAddress;
     uint admissionDate;
     uint dischargeDate;
     string visitReason;
   }
 
-  event PermissionGranted(address indexed publicAddress, bool result);
-  event PermissionChecked(address indexed publicAddress, bool result);
+  mapping (address => MedicalRecord) medicalRecordMap;
 
   constructor() public {
     owner = msg.sender;
   }
 
-  function grantPermission(address publicAddress) public returns (bool) {
+  modifier onlyUserWithoutPermission(address receiverAddress) {
+    require(
+        !permissionExists(receiverAddress),
+        "Permission already granted for the user"
+    );
+    _;
+  }
+
+  modifier onlyUserWithPermission(address receiverAddress) {
+    require(
+        permissionExists(receiverAddress),
+        "User does not have permission"
+    );
+    _;
+  }
+
+  event PermissionGranted(address indexed receiverAddress, bool result);
+  event PermissionChecked(address indexed granterAddress, bool result);
+
+  function grantPermission(address receiverAddress) public onlyUserWithoutPermission(receiverAddress) returns (bool) {
     bool result = false;
-    address[5] storage addressArray = permissions[msg.sender];
-    require(count < 5, "Maximum limit reached for granting permission. Not enough space to store any more addresses.");
-    addressArray[count] = publicAddress;
-    count = count + 1;
+    mapping (address => bool) storage receiverPermissionsLocal = permissions[msg.sender];
     result = true;
-    emit PermissionGranted(publicAddress, result);
+    receiverPermissionsLocal[receiverAddress] = result;
+    receiverPermissionsGlobal[receiverAddress] = result;
+    emit PermissionGranted(receiverAddress, result);
     return result;
   }
 
-  function hasPermission(address publicAddress) public view returns (bool) {
-    bool result = false;
-    address[5] storage addressArray = permissions[publicAddress];
-    for(uint i = 0; i < 5; i++) {
-      if(addressArray[i] == msg.sender) {
-        result = true;
-        return result;
-      }
-    }
-    result = false;
-    return result;
+  function hasPermission(address granterAddress) public view returns (bool) {
+    mapping (address => bool) storage receiverPermissionsLocal = permissions[granterAddress];
+    return receiverPermissionsLocal[msg.sender];
+  }
+
+  function permissionExists(address receiverAddress) internal view returns (bool) {
+    return receiverPermissionsGlobal[receiverAddress];
+  }
+
+  function viewMedicalRecord() public view onlyUserWithPermission(msg.sender) returns (string memory, address, uint, uint, string memory) {
+    MedicalRecord memory medicalRecord = medicalRecordMap[msg.sender];
+    return (medicalRecord.name, medicalRecord.hospitalAddress, medicalRecord.admissionDate, medicalRecord.dischargeDate, medicalRecord.visitReason);
+  }
+
+  function addMedicalRecord(string memory name, address hospitalAddress, uint admissionDate, uint dischargeDate, string memory visitReason) public onlyUserWithPermission(msg.sender) returns (bool) {
+      MedicalRecord memory medicalRecord;
+      medicalRecord.name = name;
+      medicalRecord.hospitalAddress = hospitalAddress;
+      medicalRecord.admissionDate = admissionDate;
+      medicalRecord.dischargeDate = dischargeDate;
+      medicalRecord.visitReason = visitReason;
+
+      medicalRecordMap[msg.sender] = medicalRecord;
+      return true;
   }
 }
