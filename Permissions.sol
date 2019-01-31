@@ -1,7 +1,7 @@
-pragma solidity^0.5.3;
+pragma solidity 0.5.3;
 
 contract Permissions {
-  address owner;
+  address payable owner;
   //Mapping between granter address and receiver map which in turn
   //contains mapping between receiver address and his/her permission
   mapping (address => mapping (address => bool)) public granterReceiverPermissionsMap;
@@ -24,6 +24,11 @@ contract Permissions {
     owner = msg.sender;
   }
 
+  modifier onlyOwner() {
+    require(msg.sender == owner);
+    _;
+  }
+
   modifier onlyUserWithoutPermission(address receiverAddress) {
     require(
         !receiverPermissionsMapGlobal[receiverAddress],
@@ -41,7 +46,7 @@ contract Permissions {
   }
 
   event PermissionGranted(address indexed receiverAddress, bool result);
-  event PermissionChecked(address indexed granterAddress, bool result);
+  event MedicalRecordAdded(address indexed patientAddress, string name, address hospitalAddress, uint admissionDate, uint dischargeDate, string visitReason, bool result);
 
   function grantPermission(address receiverAddress) public onlyUserWithoutPermission(receiverAddress) returns (bool) {
     bool result = false;
@@ -64,14 +69,20 @@ contract Permissions {
   }
 
   function addMedicalRecord(string memory name, address hospitalAddress, uint admissionDate, uint dischargeDate, string memory visitReason) public onlyUserWithPermission(msg.sender) returns (bool) {
-      MedicalRecord memory medicalRecord;
-      medicalRecord.name = name;
-      medicalRecord.hospitalAddress = hospitalAddress;
-      medicalRecord.admissionDate = admissionDate;
-      medicalRecord.dischargeDate = dischargeDate;
-      medicalRecord.visitReason = visitReason;
+    MedicalRecord memory medicalRecord;
+    medicalRecord.name = name;
+    medicalRecord.hospitalAddress = hospitalAddress;
+    medicalRecord.admissionDate = admissionDate;
+    medicalRecord.dischargeDate = dischargeDate;
+    medicalRecord.visitReason = visitReason;
 
-      medicalRecordMap[msg.sender] = medicalRecord;
-      return true;
+    medicalRecordMap[msg.sender] = medicalRecord;
+    emit MedicalRecordAdded(msg.sender, name, hospitalAddress, admissionDate, dischargeDate, visitReason, true);
+    return true;
+  }
+
+  //self destruct the contract
+  function close() public onlyOwner {
+    selfdestruct(owner);
   }
 }
